@@ -1,24 +1,13 @@
-﻿using System;
-using System.Runtime.Serialization;
-
-namespace IntroSkip
+﻿namespace IntroSkip
 {
-    public class InvalidIntroDetectionException : Exception
+    public class InvalidIntroDetectionException : System.Exception
     {
         public InvalidIntroDetectionException()
-        {
-        }
+        { }
+        public InvalidIntroDetectionException(string message) : base(message) { }
+        public InvalidIntroDetectionException(string message, System.Exception inner) : base(message, inner) { }
 
-        public InvalidIntroDetectionException(string message) : base(message)
-        {
-        }
-
-        public InvalidIntroDetectionException(string message, Exception inner) : base(message, inner)
-        {
-        }
-
-        protected InvalidIntroDetectionException(SerializationInfo info, StreamingContext context) : base(info, context)
-        {
-        }
+        protected InvalidIntroDetectionException(System.Runtime.Serialization.SerializationInfo info,
+            System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
     }
 }

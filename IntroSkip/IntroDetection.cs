@@ -23,49 +23,39 @@ namespace IntroSkip
 {
     public class IntroDetection : TitleSequenceDto, IServerEntryPoint
     {
-        private string _audio1SavePath = "";
-        private string _audio2SavePath = "";
-
-        public IntroDetection(IJsonSerializer json, IFileSystem file, ILogManager logMan, IFfmpegManager f,
-            IApplicationPaths applicationPaths)
-        {
-            JsonSerializer = json;
-            FileSystem = file;
-            ApplicationPaths = applicationPaths;
-            FfmpegManager = f;
-            Logger = logMan.GetLogger(Plugin.Instance.Name);
-            Instance = this;
-        }
-
-        private IJsonSerializer JsonSerializer { get; }
-        private IFileSystem FileSystem { get; }
-        private IFfmpegManager FfmpegManager { get; }
-        private static ILogger Logger { get; set; }
-        public static IntroDetection Instance { get; private set; }
+        private IJsonSerializer JsonSerializer     { get; }
+        private IFileSystem FileSystem             { get; }
+        private IFfmpegManager FfmpegManager       { get; }
+        private static ILogger Logger              { get; set; }
+        public static IntroDetection Instance      { get; private set; }
         private IApplicationPaths ApplicationPaths { get; }
-
-        private static string EpisodeComparable { get; set; }
-        private static string EpisodeToCompare { get; set; }
-
-        public void Dispose()
+       
+        public IntroDetection(IJsonSerializer json, IFileSystem file, ILogManager logMan, IFfmpegManager f, IApplicationPaths applicationPaths)
         {
+            JsonSerializer   = json;
+            FileSystem       = file;
+            ApplicationPaths = applicationPaths;
+            FfmpegManager    = f;
+            Logger           = logMan.GetLogger(Plugin.Instance.Name);
+            Instance         = this;
         }
 
-        public void Run()
-        {
-            if (!FileSystem.DirectoryExists(ApplicationPaths.PluginConfigurationsPath +
-                                            FileSystem.DirectorySeparatorChar + "IntroEncoding"))
-                FileSystem.CreateDirectory(ApplicationPaths.PluginConfigurationsPath +
-                                           FileSystem.DirectorySeparatorChar + "IntroEncoding");
-        }
-
-
+        
         // Keep integer in specified range
         private static int Clip(int val, int min, int max)
         {
-            if (val < min) return min;
-            if (val > max) return max;
-            return val;
+            if (val < min)
+            {
+                return min;
+            }
+            else if (val > max)
+            {
+                return max;
+            }
+            else
+            {
+                return val;
+            }
         }
 
         // Calculate Hamming distance between to integers (bit difference)
@@ -85,8 +75,11 @@ namespace IntroSkip
         // Calculate the similarity of two fingerprints
         private static double CompareFingerprints(List<uint> f1, List<uint> f2)
         {
-            var dist = 0.0;
-            if (f1.Count != f2.Count) return 0;
+            double dist = 0.0;
+            if (f1.Count != f2.Count)
+            {
+                return 0;
+            }
 
             foreach (var i in Enumerable.Range(0, f1.Count))
             {
@@ -101,13 +94,13 @@ namespace IntroSkip
         // Slide fingerprints to find best offset
         private static int GetBestOffset(List<uint> f1, List<uint> f2)
         {
-            var length = f1.Count;
+            var length     = f1.Count;
             var iterations = length + 1;
-            var diff = length / 2 - 1;
-            var a = length / 2;
-            var b = length - 1;
-            var x = 0;
-            var y = length / 2 - 1;
+            var diff       = length / 2 - 1;
+            var a          = length / 2;
+            var b          = length - 1;
+            var x          = 0;
+            var y          = length / 2 - 1;
 
             var output = new List<double>();
 
@@ -118,7 +111,7 @@ namespace IntroSkip
                 try
                 {
                     output.Add(CompareFingerprints(f1.GetRange(a, upper), f2.GetRange(x, upper)));
-
+                   
                     a = Clip(a - 1, 0, length - 1);
                     if (diff < 0)
                     {
@@ -150,19 +143,21 @@ namespace IntroSkip
         // Align the fingerprints according to the calculated offset
         private static Tuple<List<uint>, List<uint>> GetAlignedFingerprints(int offset, List<uint> f1, List<uint> f2)
         {
-            var offsetCorrectedF2 = new List<uint>();
-            var offsetCorrectedF1 = new List<uint>();
+            List<uint> offsetCorrectedF2 = new List<uint>();
+            List<uint> offsetCorrectedF1 = new List<uint>();
             if (offset >= 0)
             {
                 //offset = offset * -1;
                 offsetCorrectedF1.AddRange(f1.GetRange(offset, f1.Count - offset));
                 offsetCorrectedF2.AddRange(f2.GetRange(0, f2.Count - offset));
+
             }
             else
             {
-                offset = offset * -1; //ToDo: possible overflow.
+                offset = offset * -1;  //ToDo: possible overflow
                 offsetCorrectedF1.AddRange(f1.GetRange(0, f1.Count - Math.Abs(offset)));
                 offsetCorrectedF2.AddRange(f2.GetRange(offset, f2.Count - Math.Abs(offset)));
+
             }
 
             return Tuple.Create(offsetCorrectedF1, offsetCorrectedF2);
@@ -176,10 +171,15 @@ namespace IntroSkip
             foreach (var i in Enumerable.Range(0, arr.Count()))
             {
                 // Stop the execution after we've been far enough past the found intro region
-                if (start != -1 && i - end >= 100) break;
+                if (start != -1 && i - end >= 100) {
+                    break;
+                }
                 if (arr[i] < upperLimit && nextOnesAreAlsoSmall(arr, i, upperLimit))
                 {
-                    if (start == -1) start = i;
+                    if (start == -1)
+                    {
+                        start = i;
+                    }
 
                     end = i;
                 }
@@ -197,29 +197,31 @@ namespace IntroSkip
                 var v2 = arr[index + 2];
                 var v3 = arr[index + 3];
                 var average = (v1 + v2 + v3) / 3;
-                if (average < upperLimit) return true;
+                if (average < upperLimit)
+                {
+                    return true;
+                }
 
                 return false;
             }
 
             return false;
         }
-
+        
         // ReSharper disable once InconsistentNaming
         private void ExtractPCMAudio(string input, string audioOut, TimeSpan duration)
         {
             var ffmpegPath = FfmpegManager.FfmpegConfiguration.EncoderPath;
-
-            var procStartInfo = new ProcessStartInfo(ffmpegPath,
-                $"-t {duration:c} -i \"{input}\" -ac 1 -acodec pcm_s16le -ar 16000 \"{audioOut}\"")
+            
+            var procStartInfo = new ProcessStartInfo(ffmpegPath, $"-t {duration:c} -i \"{input}\" -ac 1 -acodec pcm_s16le -ar 16000 \"{audioOut}\"")
             {
                 RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
+                RedirectStandardError  = true,
+                UseShellExecute        = false,
+                CreateNoWindow         = true,
             };
 
-            using (var process = new Process {StartInfo = procStartInfo})
+            using (var process = new Process { StartInfo = procStartInfo })
             {
                 process.Start();
 
@@ -233,45 +235,52 @@ namespace IntroSkip
         private string FingerPrintAudio(string inputFileName)
         {
             // Using 600 second length to get a more accurate fingerprint, but it's not required
-            var configDir = ApplicationPaths.PluginConfigurationsPath;
-            var encodingPath =
-                $"{configDir}{FileSystem.DirectorySeparatorChar}IntroEncoding{FileSystem.DirectorySeparatorChar}";
-            var @params = $"\"{inputFileName}\" -raw -length 600 -json";
-            var fpcalc = OperatingSystem.IsWindows() ? "fpcalc.exe" : "fpcalc";
+            var configDir     = ApplicationPaths.PluginConfigurationsPath;
+            var encodingPath  = $"{configDir}{FileSystem.DirectorySeparatorChar}IntroEncoding{FileSystem.DirectorySeparatorChar}";
+            var @params       = $"\"{inputFileName}\" -raw -length 600 -json";
+            var fpcalc        = (OperatingSystem.IsWindows() ? "fpcalc.exe" : "fpcalc");
 
             var procStartInfo = new ProcessStartInfo($"{encodingPath}{fpcalc}", @params)
             {
                 RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
+                RedirectStandardError  = true,
+                UseShellExecute        = false,
+                CreateNoWindow         = true,
             };
 
-            var process = new Process {StartInfo = procStartInfo};
-
+            var process = new Process { StartInfo = procStartInfo };
+            
             process.Start();
-
+            
             string processOutput = null;
             var json = "";
 
             while ((processOutput = process.StandardOutput.ReadLine()) != null)
+            {
                 //Logger.Info(processOutput);
-                json += processOutput;
+                json += (processOutput);
+            }
 
             return json;
         }
 
+        private string _audio1SavePath  = "";
+        private string _audio2SavePath  = "";
+        
+        private static string EpisodeComparable { get; set; }
+        private static string EpisodeToCompare  { get; set; }
+        
         public List<EpisodeTitleSequence> SearchAudioFingerPrint(BaseItem episode1Input, BaseItem episode2Input)
         {
-            var encodingPath = ApplicationPaths.PluginConfigurationsPath + FileSystem.DirectorySeparatorChar +
-                               "IntroEncoding" + FileSystem.DirectorySeparatorChar;
+            var encodingPath = ApplicationPaths.PluginConfigurationsPath + FileSystem.DirectorySeparatorChar + "IntroEncoding" + FileSystem.DirectorySeparatorChar;
             Logger.Info("Starting episode intro detection process.");
-            //Logger.Info($" {episode1Input.Parent.Parent.Name} - Season: {episode1Input.Parent.IndexNumber} - Episode Comparable: {episode1Input.IndexNumber}");
-            //Logger.Info($" {episode2Input.Parent.Parent.Name} - Season: {episode2Input.Parent.IndexNumber} - Episode To Compare: {episode2Input.IndexNumber}");
+            Logger.Info($" {episode1Input.Parent.Parent.Name} - Season: {episode1Input.Parent.IndexNumber} - Episode Comparable: {episode1Input.IndexNumber}");
+            Logger.Info($" {episode2Input.Parent.Parent.Name} - Season: {episode2Input.Parent.IndexNumber} - Episode To Compare: {episode2Input.IndexNumber}");
 
             //Create the the current episode input key. Season.InternalId + episode.InternalId
             var episode1InputKey = $"{episode1Input.Parent.InternalId}{episode1Input.InternalId}";
             var episode2InputKey = $"{episode2Input.Parent.InternalId}{episode2Input.InternalId}";
+
 
 
             if (EpisodeComparable is null || episode1InputKey != EpisodeComparable)
@@ -288,7 +297,7 @@ namespace IntroSkip
                 }
             }
 
-
+            
             if (EpisodeToCompare is null || episode2InputKey != EpisodeToCompare)
             {
                 EpisodeToCompare = episode2InputKey;
@@ -299,36 +308,31 @@ namespace IntroSkip
                 {
                     Logger.Info($"Beginning Audio Extraction for Comparing Episode: {episode2Input.Path}");
                     ExtractPCMAudio(episode2Input.Path, _audio2SavePath, TimeSpan.FromMinutes(10));
+
                 }
             }
 
 
             Logger.Info("Audio Extraction Ready.");
 
-            var introDto = AnalyzeAudio();
+            var introDto =  AnalyzeAudio();
 
-            introDto[0]
-                .InternalId = episode1Input.InternalId;
-            introDto[0]
-                .IndexNumber = episode1Input.IndexNumber;
+            introDto[0].InternalId = episode1Input.InternalId;
+            introDto[0].IndexNumber = episode1Input.IndexNumber;
 
-            introDto[1]
-                .InternalId = episode2Input.InternalId;
-            introDto[1]
-                .IndexNumber = episode2Input.IndexNumber;
-
-            Logger.Info(
-                $"\n{episode1Input.Parent.Parent.Name} - S: {episode1Input.Parent.IndexNumber} - E: {episode1Input.IndexNumber} \nStarts: {introDto[0].IntroStart} \nEnd: {introDto[0].IntroEnd}\n\n");
-            Logger.Info(
-                $"\n{episode2Input.Parent.Parent.Name} - S: {episode2Input.Parent.IndexNumber} - E: {episode2Input.IndexNumber} \nStarts: {introDto[1].IntroStart} \nEnd: {introDto[1].IntroEnd}\n\n");
-
+            introDto[1].InternalId = episode2Input.InternalId;
+            introDto[1].IndexNumber = episode2Input.IndexNumber;
+           
+            Logger.Info($"\n{episode1Input.Parent.Parent.Name} - S: {episode1Input.Parent.IndexNumber} - E: {episode1Input.IndexNumber} \nStarts: {introDto[0].IntroStart} \nEnd: {introDto[0].IntroEnd}\n\n");
+            Logger.Info($"\n{episode2Input.Parent.Parent.Name} - S: {episode2Input.Parent.IndexNumber} - E: {episode2Input.IndexNumber} \nStarts: {introDto[1].IntroStart} \nEnd: {introDto[1].IntroEnd}\n\n");
+            
             return introDto;
         }
 
         private List<EpisodeTitleSequence> AnalyzeAudio()
         {
             Logger.Info("Analyzing Audio...");
-
+            
             Logger.Info(_audio1SavePath);
             Logger.Info(_audio2SavePath);
 
@@ -337,125 +341,138 @@ namespace IntroSkip
             if (fingerPrintDataEpisode1 is null)
             {
                 Logger.Info("Trying new episode");
-                throw new InvalidIntroDetectionException(
-                    $"Episode detection failed to find a fingerprint. {_audio1SavePath}");
+                throw new InvalidIntroDetectionException($"Episode detection failed to find a fingerprint. {_audio1SavePath}");
             }
-
             Logger.Info($"Fingerprint 1 Duration {fingerPrintDataEpisode1.Duration}");
-
+            
             var audio2Json = FingerPrintAudio(_audio2SavePath);
             var fingerPrintDataEpisode2 = JsonSerializer.DeserializeFromString<IntroAudioFingerprint>(audio2Json);
             if (fingerPrintDataEpisode2 is null)
             {
                 Logger.Info("Trying new episode");
-                throw new InvalidIntroDetectionException(
-                    $"Episode detection failed to find a fingerprint. {_audio2SavePath}");
+                throw new InvalidIntroDetectionException($"Episode detection failed to find a fingerprint. {_audio2SavePath}");
             }
 
             Logger.Info($"Fingerprint 2 Duration {fingerPrintDataEpisode2.Duration}");
 
             var fingerprint1 = fingerPrintDataEpisode1.Fingerprint;
             var fingerprint2 = fingerPrintDataEpisode2.Fingerprint;
-
+            
             Logger.Info("Analyzing Finger Prints..");
 
             // We'll cut off a bit of the end if the fingerprints have an odd numbered length
             if (fingerprint1.Count % 2 != 0)
             {
-                fingerprint1 = fingerprint1.GetRange(0, fingerprint1.Count() - 1);
-                fingerprint2 = fingerprint2.GetRange(0, fingerprint2.Count() - 1);
+                fingerprint1 = fingerprint1.GetRange(0, fingerprint1.Count() - 1);  
+                fingerprint2 = fingerprint2.GetRange(0, fingerprint2.Count() - 1);  
             }
 
             Logger.Info("Analyzing Offsets..");
-            var offset = GetBestOffset(fingerprint1, fingerprint2);
+            int offset = GetBestOffset(fingerprint1, fingerprint2);
 
             Logger.Info($"The calculated fingerprint offset is {offset}");
 
             var _tup_1 = GetAlignedFingerprints(offset, fingerprint1, fingerprint2);
-            var f1 = _tup_1.Item1;
-            var f2 = _tup_1.Item2;
+            var f1     = _tup_1.Item1;
+            var f2     = _tup_1.Item2;
 
 
             //Logger.Info("Calculating Hamming Distances.");
-            var hammingDistances = Enumerable.Range(0, f1.Count < f2.Count ? f1.Count : f2.Count)
-                .Select(i => GetHammingDistance(f1[i], f2[i]))
-                .ToList();
+            var hammingDistances = Enumerable.Range(0, (f1.Count < f2.Count ? f1.Count : f2.Count)).Select(i => GetHammingDistance(f1[i], f2[i])).ToList();
             Logger.Info("Calculate Hamming Distances Done.");
-
+            
             var _tup_2 = FindContiguousRegion(hammingDistances, 8);
-            var start = _tup_2.Item1;
-            var end = _tup_2.Item2;
+            var start  = _tup_2.Item1;
+            var end    = _tup_2.Item2;
 
-            var secondsPerSample = 600.0 / fingerprint1.Count;
+            double secondsPerSample = 600.0 / fingerprint1.Count;
 
-            var offsetInSeconds = offset * secondsPerSample;
+            var offsetInSeconds   = offset * secondsPerSample;
             var commonRegionStart = start * secondsPerSample;
-            var commonRegionEnd = end * secondsPerSample;
+            var commonRegionEnd   = (end * secondsPerSample);
 
-            var firstFileRegionStart = 0.0;
-            var firstFileRegionEnd = 0.0;
+            var firstFileRegionStart  = 0.0;
+            var firstFileRegionEnd    = 0.0;
             var secondFileRegionStart = 0.0;
-            var secondFileRegionEnd = 0.0;
+            var secondFileRegionEnd   = 0.0;
 
             if (offset >= 0)
             {
-                firstFileRegionStart = commonRegionStart + offsetInSeconds;
-                firstFileRegionEnd = commonRegionEnd + offsetInSeconds;
+                firstFileRegionStart  = commonRegionStart + offsetInSeconds;
+                firstFileRegionEnd    = commonRegionEnd + offsetInSeconds;
                 secondFileRegionStart = commonRegionStart;
-                secondFileRegionEnd = commonRegionEnd;
+                secondFileRegionEnd   = commonRegionEnd;
             }
             else
             {
-                firstFileRegionStart = commonRegionStart;
-                firstFileRegionEnd = commonRegionEnd;
+                firstFileRegionStart  = commonRegionStart;
+                firstFileRegionEnd    = commonRegionEnd;
                 secondFileRegionStart = commonRegionStart - offsetInSeconds;
-                secondFileRegionEnd = commonRegionEnd - offsetInSeconds;
+                secondFileRegionEnd   = commonRegionEnd - offsetInSeconds;
             }
 
             // Check for impossible situation, or if the common region is deemed too short to be considered an intro
             if (start < 0 || end < 0)
             {
-                firstFileRegionStart = 0.0;
-                firstFileRegionEnd = 0.0;
+                firstFileRegionStart  = 0.0;
+                firstFileRegionEnd    = 0.0;
                 secondFileRegionStart = 0.0;
-                secondFileRegionEnd = 0.0;
-                throw new InvalidIntroDetectionException(
-                    "Episode detection failed to find a reasonable intro start and end time.");
+                secondFileRegionEnd   = 0.0;
+                throw new InvalidIntroDetectionException("Episode detection failed to find a reasonable intro start and end time.");
             }
-
             if (commonRegionEnd - commonRegionStart < 10)
             {
                 // -1 means intro does not exists
-                firstFileRegionStart = -1.0;
-                firstFileRegionEnd = -1.0;
+                firstFileRegionStart  = -1.0;
+                firstFileRegionEnd    = -1.0;
                 secondFileRegionStart = -1.0;
-                secondFileRegionEnd = -1.0;
-                throw new InvalidIntroDetectionException(
-                    "Episode common region is deemed too short to be considered an intro.");
-            }
-
-            if (start == 0 && end == 0)
-                throw new InvalidIntroDetectionException("Episode common region are both 00:00:00.");
-
-
-            Logger.Info("Audio Analysis Complete.");
-
-
-            return new List<EpisodeTitleSequence>
+                secondFileRegionEnd   = -1.0;
+                throw new InvalidIntroDetectionException("Episode common region is deemed too short to be considered an intro.");
+                
+            } 
+            else if (start == 0 && end == 0)
             {
-                new EpisodeTitleSequence
+                throw new InvalidIntroDetectionException("Episode common region are both 00:00:00.");
+            }
+            
+            
+            Logger.Info("Audio Analysis Complete.");
+            
+            
+            
+            return new List<EpisodeTitleSequence>()
+            {
+                new EpisodeTitleSequence()
                 {
-                    HasIntro = true,
+                    HasIntro   = true,
                     IntroStart = TimeSpan.FromSeconds(Math.Round(firstFileRegionStart)),
-                    IntroEnd = TimeSpan.FromSeconds(Math.Round(firstFileRegionEnd))
+                    IntroEnd   = TimeSpan.FromSeconds(Math.Round(firstFileRegionEnd))
                 },
-                new EpisodeTitleSequence
+                new EpisodeTitleSequence()
                 {
-                    HasIntro = true,
+                    HasIntro   = true,
                     IntroStart = TimeSpan.FromSeconds(Math.Round(secondFileRegionStart)),
-                    IntroEnd = TimeSpan.FromSeconds(Math.Round(secondFileRegionEnd))
+                    IntroEnd   = TimeSpan.FromSeconds(Math.Round(secondFileRegionEnd))
                 }
             };
+
+            
         }
+
+        public void Dispose()
+        {
+            
+        }
+
+        public void Run()
+        {
+           
+            if (!FileSystem.DirectoryExists(ApplicationPaths.PluginConfigurationsPath + FileSystem.DirectorySeparatorChar + "IntroEncoding"))
+            {
+                FileSystem.CreateDirectory( ApplicationPaths.PluginConfigurationsPath + FileSystem.DirectorySeparatorChar + "IntroEncoding" );
+            }
+        }
+
+
     }
 }
